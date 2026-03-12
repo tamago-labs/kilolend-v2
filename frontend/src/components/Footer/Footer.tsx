@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ExternalLink } from 'react-feather';
 
 export const Footer = () => {
@@ -9,7 +10,7 @@ export const Footer = () => {
           <img
             src="/images/kilolend-logo-desktop.png"
             alt="KiloLend"
-            className="h-[78px] w-[232px]"
+            className="h-13 w-38"
           />
           <p className="text-sm leading-relaxed text-slate-400 max-w-[320px]">
             KiloLend is the capital layer for tokenized AI agents.
@@ -19,30 +20,30 @@ export const Footer = () => {
         {/* Product Links */}
         <div className="flex flex-col gap-4">
           <h3 className="text-base font-bold text-white mb-2">Product</h3>
-          <a
-            href="/markets"
+          <Link
+            to="/markets"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Lending Markets
-          </a>
-          <a
-            href="/agents"
+          </Link>
+          <Link
+            to="/agents"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Agent Hub
-          </a>
-          <a
-            href="/portfolio"
+          </Link>
+          <Link
+            to="/portfolio"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Portfolio
-          </a>
-          <a
-            href="/leaderboard"
+          </Link>
+          <Link
+            to="/leaderboard"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Leaderboard
-          </a>
+          </Link>
         </div>
 
         {/* Resources */}
@@ -121,18 +122,18 @@ export const Footer = () => {
           © 2026 KiloLend. All rights reserved.
         </p>
         <div className="flex gap-6 flex-col md:flex-row">
-          <a
-            href="/terms"
+          <Link
+            to="/terms"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Terms
-          </a>
-          <a
-            href="/privacy"
+          </Link>
+          <Link
+            to="/privacy"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Privacy
-          </a>
+          </Link>
         </div>
       </div>
     </footer>
