@@ -16,7 +16,7 @@ export const COMPTROLLER_ADDRESSES: Record<number, string> = {
   96: '0x42f098E6aE5e81f357D3fD6e104BAA77A195133A',   // BitKUB Chain
   42793: '0x42f098E6aE5e81f357D3fD6e104BAA77A195133A',  // Etherlink
   8217: '0x2591d179a0B1dB1c804210E111035a3a13c95a48', // Klaytn/Kaia
-  // Celo: Add address when available
+  // 42220: // Celo - TODO: Add Comptroller address when deployed
 } as const;
 
 export type ChainId = keyof typeof COMPTROLLER_ADDRESSES;

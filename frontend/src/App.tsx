@@ -10,7 +10,7 @@ import { Portfolio } from './pages/Portfolio';
 import { Leaderboard } from './pages/Leaderboard';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
-import {  usePrices } from './hooks';
+import { usePrices, useInitializeMultiChain } from './hooks';
 
 const currentPageToComponent: Record<string, React.ComponentType> = {
   '/': Home,
@@ -25,8 +25,12 @@ const currentPageToComponent: Record<string, React.ComponentType> = {
 };
 
 function App() {
+  // Initialize prices
+  usePrices();
   
-  usePrices()
+  // Initialize markets for all supported chains
+  // This will fetch all market data and start 60-second auto-refresh
+  useInitializeMultiChain([96, 8217, 42793, 42220]);
 
   const [currentPage, setCurrentPage] = useState('/');
 

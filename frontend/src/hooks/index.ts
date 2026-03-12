@@ -12,6 +12,7 @@ export {
   useMarketRates,
   useMarketStats,
   useUserMarketData,
+  fetchMarketBasicInfo,
   type MarketBasicInfo,
   type MarketRates,
   type MarketStats,
@@ -21,6 +22,7 @@ export {
 // Token Hooks
 export {
   useTokenInfo,
+  fetchTokenInfo,
   type TokenInfo,
 } from './useTokenInfo';
 
@@ -30,8 +32,15 @@ export { useMarkets, type Market } from './useMarkets';
 // Market Data Hooks
 export {
   useMarketData,
+  fetchMarketData,
   type MarketData,
 } from './useMarketsData';
+
+// Market Initialization Hooks
+export {
+  useInitializeMarkets,
+  useInitializeMultiChain,
+} from './useInitializeMarkets';
 
 // Price Hooks
 export {

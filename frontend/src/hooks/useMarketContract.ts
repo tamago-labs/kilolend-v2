@@ -1,5 +1,28 @@
 import { useReadContract } from 'wagmi';
+import { createPublicClient, http, type Chain, type Address } from 'viem';
 import cTokenAbi from '../contracts/abis/cToken.json';
+import { kaia, etherlink, kubChain, celo } from '../wagmi';
+
+// Map chain IDs to their viem chain configs
+const chainMap: Record<number, Chain> = {
+  8217: kaia,
+  42793: etherlink,
+  96: kubChain,
+  42220: celo,
+};
+
+function getPublicClientForChain(chainId: number) {
+  const chain = chainMap[chainId];
+  if (!chain) {
+    throw new Error(`Unsupported chain ID: ${chainId}`);
+  }
+  // Use the chain's default RPC URL
+  const rpcUrl = chain.rpcUrls.default.http[0];
+  return createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  });
+}
 
 /**
  * Types for market data
@@ -235,4 +258,63 @@ export function useUserMarketData(marketAddress: `0x${string}` | undefined, user
       : undefined,
     isLoading: balanceOf === undefined || borrowBalanceStored === undefined,
   };
+}
+
+/**
+ * Fetch basic market information (standalone function)
+ * This can be used outside of React components (e.g., in Zustand store)
+ */
+export async function fetchMarketBasicInfo(
+  marketAddress: Address,
+  chainId: number
+): Promise<MarketBasicInfo | null> {
+  try {
+    const client = getPublicClientForChain(chainId);
+
+    // Try to get underlying address - if it fails, this is a native token market
+    let underlying: Address | null = null;
+    let isNative = false;
+
+    try {
+      underlying = await client.readContract({
+        address: marketAddress,
+        abi: cTokenAbi,
+        functionName: 'underlying',
+      }) as Address;
+    } catch {
+      // Native token markets don't have an underlying() function
+      isNative = true;
+    }
+
+    const [symbol, name, decimals] = await Promise.all([
+      client.readContract({
+        address: marketAddress,
+        abi: cTokenAbi,
+        functionName: 'symbol',
+      }),
+      client.readContract({
+        address: marketAddress,
+        abi: cTokenAbi,
+        functionName: 'name',
+      }),
+      client.readContract({
+        address: marketAddress,
+        abi: cTokenAbi,
+        functionName: 'decimals',
+      }),
+    ]);
+
+    return {
+      underlying: (isNative
+        ? '0x0000000000000000000000000000000000000000'
+        : underlying) as Address,
+      symbol: symbol as string,
+      name: name as string,
+      decimals: decimals as number,
+      isNative,
+    };
+  } catch (error) {
+    console.error(`Error fetching market basic info for ${marketAddress}:`, error);
+    return null;
+  }
 }

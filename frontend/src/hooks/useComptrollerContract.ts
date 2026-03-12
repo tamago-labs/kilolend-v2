@@ -10,13 +10,18 @@ export function useComptrollerContract(chainId: number | undefined) {
   // Get Comptroller address for the current chain
   const comptrollerAddress = chainId ? COMPTROLLER_ADDRESSES[chainId] : undefined;
 
+  // Check if the chain has a valid comptroller address configured
+  // Note: Having an address doesn't guarantee the contract exists or has the function
+  const hasValidConfig = !!comptrollerAddress && !!chainId;
+
   // Fetch all markets from Comptroller
   const { data: markets, isLoading, error, refetch } = useReadContract({
     address: comptrollerAddress as `0x${string}`,
     abi: comptrollerAbi,
     functionName: 'getAllMarkets',
+    chainId,
     query: {
-      enabled: !!comptrollerAddress && !!chainId,
+      enabled: hasValidConfig,
       staleTime: 60_000, // Cache for 1 minute
       retry: 3,
     },
@@ -24,8 +29,8 @@ export function useComptrollerContract(chainId: number | undefined) {
 
   return {
     markets: markets as `0x${string}`[] | undefined,
-    isLoading,
-    error,
+    isLoading: hasValidConfig ? isLoading : false,
+    error: hasValidConfig ? error : null,
     refetch,
     comptrollerAddress,
   };
@@ -42,6 +47,7 @@ export function useUserMarkets(chainId: number | undefined, userAddress?: `0x${s
     abi: comptrollerAbi,
     functionName: 'getAssetsIn',
     args: [userAddress],
+    chainId,
     query: {
       enabled: !!comptrollerAddress && !!chainId && !!userAddress,
       staleTime: 30_000, // Cache for 30 seconds

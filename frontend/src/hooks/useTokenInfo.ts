@@ -1,5 +1,27 @@
 import { useReadContract } from 'wagmi';
-import { parseAbi, type Address } from 'viem';
+import { parseAbi, type Address, createPublicClient, http, type Chain } from 'viem';
+import { kaia, etherlink, kubChain, celo } from '../wagmi';
+
+// Map chain IDs to their viem chain configs
+const chainMap: Record<number, Chain> = {
+  8217: kaia,
+  42793: etherlink,
+  96: kubChain,
+  42220: celo,
+};
+
+function getPublicClientForChain(chainId: number) {
+  const chain = chainMap[chainId];
+  if (!chain) {
+    throw new Error(`Unsupported chain ID: ${chainId}`);
+  }
+  // Use the chain's default RPC URL
+  const rpcUrl = chain.rpcUrls.default.http[0];
+  return createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  });
+}
 
 /**
  * Standard ERC-20 ABI
@@ -68,4 +90,44 @@ export function useTokenInfo(tokenAddress: Address | undefined) {
     isLoading,
     error,
   };
+}
+
+/**
+ * Fetch ERC-20 token information (standalone function)
+ * This can be used outside of React components (e.g., in Zustand store)
+ */
+export async function fetchTokenInfo(
+  tokenAddress: Address,
+  chainId: number
+): Promise<TokenInfo | null> {
+  try {
+    const client = getPublicClientForChain(chainId);
+
+    const [symbol, name, decimals] = await Promise.all([
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'symbol',
+      }),
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'name',
+      }),
+      client.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+      }),
+    ]);
+
+    return {
+      symbol: symbol as string,
+      name: name as string,
+      decimals: decimals as number,
+    };
+  } catch (error) {
+    console.error(`Error fetching token info for ${tokenAddress}:`, error);
+    return null;
+  }
 }
