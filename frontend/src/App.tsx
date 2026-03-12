@@ -10,6 +10,7 @@ import { Portfolio } from './pages/Portfolio';
 import { Leaderboard } from './pages/Leaderboard';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
+import {  usePrices } from './hooks';
 
 const currentPageToComponent: Record<string, React.ComponentType> = {
   '/': Home,
@@ -24,6 +25,9 @@ const currentPageToComponent: Record<string, React.ComponentType> = {
 };
 
 function App() {
+  
+  usePrices()
+
   const [currentPage, setCurrentPage] = useState('/');
 
   useEffect(() => {
