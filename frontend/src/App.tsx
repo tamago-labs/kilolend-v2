@@ -1,4 +1,4 @@
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header/Header';
 import { Footer } from './components/Footer/Footer';
 import { Home } from './pages/Home';
@@ -11,27 +11,52 @@ import { Leaderboard } from './pages/Leaderboard';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
 
+const currentPageToComponent: Record<string, React.ComponentType> = {
+  '/': Home,
+  '/markets': Markets,
+  '/swap': Swap,
+  '/agents': Agents,
+  '/launch-token': LaunchToken,
+  '/portfolio': Portfolio,
+  '/leaderboard': Leaderboard,
+  '/terms': Terms,
+  '/privacy': Privacy,
+};
+
 function App() {
+  const [currentPage, setCurrentPage] = useState('/');
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') || '/';
+      setCurrentPage(hash);
+    };
+    
+    // Initial load
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    
+    // Cleanup
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleNavigate = (path: string) => {
+    setCurrentPage(path);
+    window.location.hash = path;
+  };
+
+  const CurrentPageComponent = currentPageToComponent[currentPage] || Home;
+
   return (
-    <Router>
-      <div className="bg-slate-100 min-h-screen flex flex-col font-sans">
-        <Header />
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/markets" element={<Markets />} />
-            <Route path="/swap" element={<Swap />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/launch-token" element={<LaunchToken />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </Router>
+    <div className="bg-slate-100 min-h-screen flex flex-col font-sans">
+      <Header onNavigate={handleNavigate} />
+      <main className="flex-1">
+        <CurrentPageComponent />
+      </main>
+      <Footer />
+    </div>
   );
 }
 

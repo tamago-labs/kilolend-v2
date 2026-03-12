@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { Settings, Clock, ChevronDown, ExternalLink } from 'react-feather';
 
-export const Header = () => {
+interface HeaderProps {
+  onNavigate: (path: string) => void;
+}
+
+export const Header = ({ onNavigate }: HeaderProps) => {
   const [showNavDropdown, setShowNavDropdown] = useState(false);
   const [isConnected] = useState(false); // Mock wallet connection state
-  const navigate = useNavigate();
 
   return (
     <header className="flex justify-between items-center px-8 py-4 bg-white border-b border-slate-200 sticky top-0 z-50 h-18">
@@ -14,7 +16,7 @@ export const Header = () => {
         {/* Brand Logo */}
         <div
           className="flex items-center cursor-pointer relative"
-          onClick={() => navigate('/')}
+          onClick={() => onNavigate('/')}
         >
           <img
             src="/images/kilolend-logo-desktop.png"
@@ -31,19 +33,19 @@ export const Header = () => {
         <nav className="hidden md:flex gap-6">
           <div
             className="text-base font-medium text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
-            onClick={() => navigate('/markets')}
+            onClick={() => onNavigate('/markets')}
           >
             Lending
           </div>
           <div
             className="text-base font-medium text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
-            onClick={() => navigate('/agents')}
+            onClick={() => onNavigate('/agents')}
           >
             Agent Hub
           </div>
           <div
             className="text-base font-medium text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
-            onClick={() => navigate('/launch-token')}
+            onClick={() => onNavigate('/launch-token')}
           >
             Launch Token
           </div>
@@ -67,7 +69,7 @@ export const Header = () => {
                 <div
                   className="px-4 py-3 rounded-lg cursor-pointer text-sm text-slate-900 transition-colors flex items-center gap-3 hover:bg-slate-50"
                   onClick={() => {
-                    navigate('/leaderboard');
+                    onNavigate('/leaderboard');
                     setShowNavDropdown(false);
                   }}
                 >
@@ -76,7 +78,7 @@ export const Header = () => {
                 <div
                   className="px-4 py-3 rounded-lg cursor-pointer text-sm text-slate-900 transition-colors flex items-center gap-3 hover:bg-slate-50"
                   onClick={() => {
-                    navigate('/portfolio');
+                    onNavigate('/portfolio');
                     setShowNavDropdown(false);
                   }}
                 >

@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { ExternalLink } from 'react-feather';
 
 export const Footer = () => {
@@ -20,30 +19,30 @@ export const Footer = () => {
         {/* Product Links */}
         <div className="flex flex-col gap-4">
           <h3 className="text-base font-bold text-white mb-2">Product</h3>
-          <Link
-            to="/markets"
+          <a
+            href="#/markets"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Lending Markets
-          </Link>
-          <Link
-            to="/agents"
+          </a>
+          <a
+            href="#/agents"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Agent Hub
-          </Link>
-          <Link
-            to="/portfolio"
+          </a>
+          <a
+            href="#/portfolio"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Portfolio
-          </Link>
-          <Link
-            to="/leaderboard"
+          </a>
+          <a
+            href="#/leaderboard"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Leaderboard
-          </Link>
+          </a>
         </div>
 
         {/* Resources */}
@@ -122,18 +121,18 @@ export const Footer = () => {
           © 2026 KiloLend. All rights reserved.
         </p>
         <div className="flex gap-6 flex-col md:flex-row">
-          <Link
-            to="/terms"
+          <a
+            href="#/terms"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Terms
-          </Link>
-          <Link
-            to="/privacy"
+          </a>
+          <a
+            href="#/privacy"
             className="text-sm text-slate-400 no-underline transition-colors hover:text-green-500"
           >
             Privacy
-          </Link>
+          </a>
         </div>
       </div>
     </footer>
