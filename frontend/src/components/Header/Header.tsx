@@ -16,7 +16,7 @@ export const Header = ({ onNavigate }: HeaderProps) => {
 
   const getChainIcon = (id: number): string => {
     if (id === 8217) return '/images/blockchain-icons/kaia-token-icon.png'; // KAIA
-    if (id === 1280) return '/images/blockchain-icons/etherlink-icon.png'; // Etherlink
+    if (id === 42793) return '/images/blockchain-icons/etherlink-icon.png'; // Etherlink
     if (id === 96) return '/images/blockchain-icons/kub-chain-icon.png'; // KUB
     if (id === 42220) return '/images/blockchain-icons/celo-icon.png'; // Celo
     return '';
@@ -24,7 +24,7 @@ export const Header = ({ onNavigate }: HeaderProps) => {
 
   const getChainName = (id: number): string => {
     if (id === 8217) return 'KAIA';
-    if (id === 1280) return 'Etherlink';
+    if (id === 42793) return 'Etherlink';
     if (id === 96) return 'KUB';
     if (id === 42220) return 'Celo';
     return '';
@@ -32,7 +32,7 @@ export const Header = ({ onNavigate }: HeaderProps) => {
 
   const getChainExplorerUrl = (id: number): string => {
     if (id === 8217) return 'https://kaiascan.io';
-    if (id === 1280) return 'https://explorer.etherlink.com';
+    if (id === 42793) return 'https://explorer.etherlink.com';
     if (id === 96) return 'https://kubscan.com';
     if (id === 42220) return 'https://celoscan.io';
     return '';
