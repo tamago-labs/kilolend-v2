@@ -46,10 +46,10 @@ export const Header = ({ onNavigate }: HeaderProps) => {
   return (
     <header className="flex justify-between items-center px-8 py-4 bg-white border-b border-slate-200 sticky top-0 z-50 h-18">
       {/* Left Section */}
-      <div className="flex items-center gap-6">
+      <div className="hidden md:flex items-center gap-6">
         {/* Brand Logo */}
         <div
-          className="flex items-center cursor-pointer relative"
+          className="hidden md:flex items-center cursor-pointer relative"
           onClick={() => onNavigate('/')}
         >
           <img
@@ -81,7 +81,7 @@ export const Header = ({ onNavigate }: HeaderProps) => {
             className="text-base font-medium text-slate-500 cursor-pointer hover:text-slate-900 transition-colors"
             onClick={() => onNavigate('/launch-token')}
           >
-            Launch Token
+            Launch Agent
           </div>
 
           {/* More Dropdown */}

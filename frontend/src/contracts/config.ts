@@ -10,13 +10,14 @@ export const NATIVE_TOKENS: Record<number, { symbol: string; name: string; decim
   96: { symbol: 'KUB', name: 'KUB Coin', decimals: 18 },      // BitKUB Chain
   42793: { symbol: 'XTZ', name: 'Tezos', decimals: 18 },          // Etherlink
   8217: { symbol: 'KAIA', name: 'KAIA', decimals: 18 },        // Klaytn/Kaia
+  42220: { symbol: 'CELO', name: 'CELO', decimals: 18 },        // Celo
 } as const;
 
 export const COMPTROLLER_ADDRESSES: Record<number, string> = {
   96: '0x42f098E6aE5e81f357D3fD6e104BAA77A195133A',   // BitKUB Chain
   42793: '0x42f098E6aE5e81f357D3fD6e104BAA77A195133A',  // Etherlink
   8217: '0x2591d179a0B1dB1c804210E111035a3a13c95a48', // Klaytn/Kaia
-  // 42220: // Celo - TODO: Add Comptroller address when deployed
+  42220: '0x790057160a6B183C80C0514f644eA6BCE9EDa0D4' // Celo 
 } as const;
 
 export type ChainId = keyof typeof COMPTROLLER_ADDRESSES;

@@ -26,12 +26,11 @@ export const Hero = ({ onNavigate }: HeroSectionProps) => {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center relative z-10">
         {/* Left Content */}
         <div className="z-10">
-          <h1 className="text-4xl md:text-[48px] font-extrabold text-slate-800 mb-6 leading-tight">
-            On-chain Bank for OpenClaw Agents
+          <h1 className="text-3xl md:text-5xl font-semibold   bg-gradient-to-r from-green-500 via-green-500 to-green-400 bg-clip-text text-transparent mb-6 leading-tight">
+            On-chain Bank for Autonomous Agents
           </h1>
-          <p className="text-lg text-slate-500 mb-10 leading-relaxed max-w-lg">
-            Launch OpenClaw agents with wallets and token economies.
-            Let agents manage capital, execute tasks, and interact with on-chain protocols autonomously.
+          <p className="text-sm md:text-lg text-slate-500 mb-10 leading-relaxed max-w-lg">
+            Launch OpenClaw-powered agents with wallets and token economies. Let them manage capital and interact with on-chain protocols autonomously.
           </p>
 
           {/* CTA Buttons */}
@@ -40,7 +39,7 @@ export const Hero = ({ onNavigate }: HeroSectionProps) => {
               onClick={() => onNavigate('/markets')}
               className="bg-gradient-to-r from-green-500 to-green-600 text-white border-none px-8 py-4 text-base font-semibold rounded-xl cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/30 min-w-[160px] w-[200px]"
             >
-              Lend to Agents
+              View Markets
             </button>
             <button
               onClick={() => window.open('https://discord.gg/BDQnjcHbnj', '_blank', 'noopener,noreferrer')}

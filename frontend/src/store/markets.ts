@@ -1,389 +1,301 @@
 /**
  * Markets Store (Zustand)
- * Global state management for market data across all chains
- * Fetches real data from blockchain contracts and auto-refreshes every 60 seconds
+ * Global state management for cross-chain market data
  */
 
 import { create } from 'zustand';
-import type { Market } from '../hooks/useMarkets';
 import type { MarketData } from '../hooks/useMarketsData';
-
-// Re-export MarketData for convenience
-export type { MarketData };
-
-// Extended type that includes chainId for components that need chain context
-export interface MarketDataWithChain extends MarketData {
-  chainId: number;
-}
-import { fetchMarketData } from '../hooks/useMarketsData';
+import { fetchMarketsFromComptroller } from '../hooks/useComptrollerContract';
 import { fetchMarketBasicInfo } from '../hooks/useMarketContract';
 import { fetchTokenInfo } from '../hooks/useTokenInfo';
+import { fetchMarketData } from '../hooks/useMarketsData';
 import { NATIVE_TOKENS } from '../contracts/config';
 
+// Supported chains
+const SUPPORTED_CHAINS = [96, 42793, 8217, 42220];
+
+/**
+ * Markets State Interface
+ */
 export interface MarketsState {
-  // Markets data: chainId -> marketAddress -> MarketData
-  marketsData: Record<number, Record<string, MarketData>>;
+  // Nested structure: chainId -> marketAddress -> MarketData
+  marketsByChain: Record<number, Record<string, MarketData>>;
   
-  // Markets list per chain: chainId -> Market[]
-  markets: Record<number, Market[]>;
+  // Flat list for easy access across all chains
+  allMarkets: MarketData[];
   
-  // Loading state per chain
-  isLoading: Record<number, boolean>;
+  // Per-chain loading states
+  loadingByChain: Record<number, boolean>;
   
-  // Error state per chain
-  errors: Record<number, string | null>;
+  // Per-chain error states
+  errorsByChain: Record<number, string | null>;
   
-  // Last fetch timestamp per chain
-  lastFetch: Record<number, number>;
+  // Global loading state
+  isLoading: boolean;
   
-  // Whether data has been fetched at least once per chain
-  hasFetched: Record<number, boolean>;
+  // Global error
+  error: string | null;
   
-  // Auto-refresh interval reference
-  refreshInterval: NodeJS.Timeout | null;
+  // Whether markets have been fetched at least once
+  hasFetched: boolean;
   
-  // Chains being tracked for auto-refresh
-  trackedChains: Set<number>;
+  /**
+   * Fetch markets from all supported chains
+   */
+  fetchAllMarkets: () => Promise<void>;
   
-  // Fetch market data for all markets in a chain from market addresses
-  fetchMarketsDataFromAddresses: (chainId: number, marketAddresses: `0x${string}`[]) => Promise<void>;
+  /**
+   * Fetch markets from a specific chain
+   */
+  fetchChainMarkets: (chainId: number) => Promise<void>;
   
-  // Fetch market data for all markets in a chain (deprecated - use fetchMarketsDataFromAddresses)
-  fetchMarketsData: (chainId: number, markets: Market[]) => Promise<void>;
+  /**
+   * Get markets for a specific chain
+   */
+  getChainMarkets: (chainId: number) => MarketData[];
   
-  // Fetch market data for a specific market
-  fetchSingleMarketData: (chainId: number, market: Market) => Promise<void>;
+  /**
+   * Refresh a specific market
+   */
+  refreshMarket: (chainId: number, marketAddress: string) => Promise<void>;
   
-  // Start auto-refresh for all tracked chains
-  startAutoRefresh: (intervalMs?: number) => void;
-  
-  // Stop auto-refresh
-  stopAutoRefresh: () => void;
-  
-  // Track a chain for auto-refresh
-  trackChain: (chainId: number) => void;
-  
-  // Untrack a chain from auto-refresh
-  untrackChain: (chainId: number) => void;
-  
-  // Clear error for a specific chain
-  clearError: (chainId: number) => void;
-  
-  // Clear all data
-  clearAll: () => void;
-  
-  // Clear data for a specific chain
-  clearChain: (chainId: number) => void;
+  /**
+   * Clear all error states
+   */
+  clearErrors: () => void;
+}
+
+/**
+ * Fetch complete market data for a single market address
+ * Follows the 5-step process:
+ * 1. Get cToken basic info (includes isNative flag)
+ * 2. Check if it's a native token market
+ * 3. Get underlying token info (only for non-native tokens)
+ * 4. Build market object with correct token info
+ * 5. Get market data (rates, stats)
+ */
+async function fetchCompleteMarketData(
+  marketAddress: string,
+  chainId: number
+): Promise<MarketData | null> {
+  try {
+    // Step 1: Get cToken basic info (includes isNative flag)
+    const cTokenInfo = await fetchMarketBasicInfo(marketAddress as `0x${string}`, chainId);
+    if (!cTokenInfo) {
+      console.warn(`Failed to fetch basic info for market ${marketAddress} on chain ${chainId}`);
+      return null;
+    }
+
+    // Step 2: Check if it's a native token market
+    const isNative = cTokenInfo.isNative;
+
+    // Step 3: Get underlying token info (only for non-native tokens)
+    let underlyingToken = null;
+    if (!isNative && cTokenInfo.underlying !== '0x0000000000000000000000000000000000000000') {
+      underlyingToken = await fetchTokenInfo(cTokenInfo.underlying, chainId);
+    }
+
+    // Step 4: Build market object with correct token info
+    if (!isNative && !underlyingToken) {
+      console.warn(`Failed to fetch underlying token info for ${marketAddress} on chain ${chainId}`);
+      return null;
+    }
+
+    const marketObj = {
+      address: marketAddress as `0x${string}`,
+      underlying: cTokenInfo.underlying,
+      // For native tokens, use the cToken info (which is already the native token)
+      // For ERC-20 tokens, use the underlying token info
+      symbol: isNative
+        ? cTokenInfo.symbol.replace('c', '') // Remove 'c' prefix (e.g., "cKUB" -> "KUB")
+        : underlyingToken!.symbol,
+      name: isNative
+        ? NATIVE_TOKENS[chainId]?.name || cTokenInfo.name.replace('Compound ', '') // Use native token name
+        : underlyingToken!.name,
+      decimals: isNative
+        ? NATIVE_TOKENS[chainId]?.decimals || 18 // Use native token decimals
+        : underlyingToken!.decimals,
+    };
+
+    // Step 5: Get market data (rates, stats)
+    const marketData = await fetchMarketData(marketObj, chainId);
+    
+    return marketData;
+  } catch (error) {
+    console.error(`Error fetching complete market data for ${marketAddress}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Fetch all markets for a specific chain
+ */
+async function fetchChainMarketsInternal(
+  chainId: number,
+  setLoading: (loading: boolean) => void,
+  setError: (error: string | null) => void,
+  setMarkets: (markets: Record<string, MarketData>) => void
+): Promise<MarketData[]> {
+  setLoading(true);
+  setError(null);
+
+  try {
+
+    // Get all market addresses from Comptroller
+    const marketAddresses = await fetchMarketsFromComptroller(chainId);
+    
+    if (!marketAddresses || marketAddresses.length === 0) {
+      setError(`No markets found for chain ${chainId}`);
+      setLoading(false);
+      return [];
+    }
+
+    // Fetch complete data for each market (parallel)
+    const marketDataPromises = marketAddresses.map(async (address) => {
+      return await fetchCompleteMarketData(address, chainId);
+    });
+
+    const marketResults = await Promise.all(marketDataPromises);
+
+    // Filter out null results and build the markets object
+    const successfulMarkets = marketResults.filter((m): m is MarketData => m !== null);
+    const marketsMap: Record<string, MarketData> = {};
+    
+    successfulMarkets.forEach((market) => {
+      marketsMap[market.address] = market;
+    });
+
+    setMarkets(marketsMap);
+    return successfulMarkets;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : `Failed to fetch markets for chain ${chainId}`;
+    setError(errorMessage);
+    console.error(`Error fetching markets for chain ${chainId}:`, error);
+    return [];
+  } finally {
+    setLoading(false);
+  }
+}
+
+/**
+ * Helper function to flatten markets from all chains into a single array
+ */
+function flattenAllMarkets(marketsByChain: Record<number, Record<string, MarketData>>): MarketData[] {
+  return Object.values(marketsByChain).flatMap(chainMarkets => 
+    Object.values(chainMarkets)
+  );
 }
 
 export const useMarketsStore = create<MarketsState>((set, get) => ({
-  marketsData: {},
-  markets: {},
-  isLoading: {},
-  errors: {},
-  lastFetch: {},
-  hasFetched: {},
-  refreshInterval: null,
-  trackedChains: new Set(),
-  
-  fetchMarketsDataFromAddresses: async (chainId: number, marketAddresses: `0x${string}`[]) => {
-    set((state) => ({
-      isLoading: { ...state.isLoading, [chainId]: true },
-      errors: { ...state.errors, [chainId]: null },
-    }));
-    
+  marketsByChain: {},
+  allMarkets: [],
+  loadingByChain: SUPPORTED_CHAINS.reduce((acc, chainId) => ({ ...acc, [chainId]: false }), {}),
+  errorsByChain: SUPPORTED_CHAINS.reduce((acc, chainId) => ({ ...acc, [chainId]: null }), {}),
+  isLoading: false,
+  error: null,
+  hasFetched: false,
+
+  fetchAllMarkets: async () => {
+    set({ isLoading: true, error: null });
+
     try {
-      // Fetch complete data for all markets in parallel
-      const marketDataPromises = marketAddresses.map(async (marketAddress) => {
-        // Step 1: Fetch cToken basic info
-        const basicInfo = await fetchMarketBasicInfo(marketAddress, chainId);
-        if (!basicInfo) return null;
-
-        // Step 2: Get token info (use native config for native tokens)
-        let tokenInfo;
-        if (basicInfo.isNative) {
-          // Use native token configuration
-          const nativeConfig = NATIVE_TOKENS[chainId] || NATIVE_TOKENS[96];
-          tokenInfo = {
-            symbol: basicInfo.symbol.replace('c', ''), // Remove 'c' prefix
-            name: nativeConfig.name,
-            decimals: nativeConfig.decimals,
-          };
-        } else {
-          // Fetch underlying token info for ERC-20 tokens
-          tokenInfo = await fetchTokenInfo(basicInfo.underlying, chainId);
-          if (!tokenInfo) return null;
-        }
-
-        // Step 3: Build Market object
-        const market: Market = {
-          address: marketAddress,
-          underlying: basicInfo.underlying,
-          symbol: tokenInfo.symbol,
-          name: tokenInfo.name,
-          decimals: tokenInfo.decimals,
-        };
-
-        // Step 4: Fetch market data (rates, stats)
-        const marketData = await fetchMarketData(market, chainId);
-        return marketData;
+      // Fetch markets from all chains in parallel
+      const chainPromises = SUPPORTED_CHAINS.map(async (chainId) => {
+        return await fetchChainMarketsInternal(
+          chainId,
+          (loading) => set((state) => ({
+            loadingByChain: { ...state.loadingByChain, [chainId]: loading }
+          })),
+          (error) => set((state) => ({
+            errorsByChain: { ...state.errorsByChain, [chainId]: error }
+          })),
+          (markets) => set((state) => ({
+            marketsByChain: { ...state.marketsByChain, [chainId]: markets }
+          }))
+        );
       });
-      
-      const results = await Promise.all(marketDataPromises);
-      
-      // Build the markets data map and markets list
-      const newMarketsData: Record<string, MarketData> = {};
-      const newMarkets: Market[] = [];
-      let successCount = 0;
-      
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result) {
-          newMarketsData[result.address] = result;
-          newMarkets.push({
-            address: result.address,
-            underlying: result.underlying,
-            symbol: result.symbol,
-            name: result.name,
-            decimals: result.decimals,
-          });
-          successCount++;
-        }
-      }
-      
-      if (successCount === 0) {
-        throw new Error('Failed to fetch any market data');
-      }
-      
-      set((state) => ({
-        marketsData: {
-          ...state.marketsData,
-          [chainId]: newMarketsData,
-        },
-        markets: {
-          ...state.markets,
-          [chainId]: newMarkets,
-        },
-        isLoading: { ...state.isLoading, [chainId]: false },
-        errors: { ...state.errors, [chainId]: null },
-        lastFetch: { ...state.lastFetch, [chainId]: Date.now() },
-        hasFetched: { ...state.hasFetched, [chainId]: true },
-      }));
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch market data';
-      set((state) => ({
-        isLoading: { ...state.isLoading, [chainId]: false },
-        errors: { ...state.errors, [chainId]: errorMessage },
-      }));
+
+      const allChainResults = await Promise.all(chainPromises);
+
+      // Flatten all markets into a single array
+      const allMarketsFlat = allChainResults.flat();
+
+      set({
+        allMarkets: allMarketsFlat,
+        isLoading: false,
+        error: null,
+        hasFetched: true,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch markets';
+      set({
+        isLoading: false,
+        error: errorMessage,
+        hasFetched: true,
+      });
     }
   },
 
-  fetchMarketsData: async (chainId: number, markets: Market[]) => {
-    // Deprecated - use fetchMarketsDataFromAddresses for new implementations
-    set((state) => ({
-      isLoading: { ...state.isLoading, [chainId]: true },
-      errors: { ...state.errors, [chainId]: null },
-    }));
-    
-    try {
-      // Fetch data for all markets in parallel
-      const marketDataPromises = markets.map((market) =>
-        fetchMarketData(market, chainId)
-      );
-      
-      const results = await Promise.all(marketDataPromises);
-      
-      // Build the markets data map
-      const newMarketsData: Record<string, MarketData> = {};
-      let successCount = 0;
-      
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (result) {
-          newMarketsData[markets[i].address] = result;
-          successCount++;
-        }
+  fetchChainMarkets: async (chainId: number) => {
+    const markets = await fetchChainMarketsInternal(
+      chainId,
+      (loading) => set((state) => ({
+        loadingByChain: { ...state.loadingByChain, [chainId]: loading }
+      })),
+      (error) => set((state) => ({
+        errorsByChain: { ...state.errorsByChain, [chainId]: error }
+      })),
+      (markets) => {
+        set((state) => {
+          const updatedMarketsByChain = { ...state.marketsByChain, [chainId]: markets };
+          // Update allMarkets flat list
+          const allMarketsFlat = flattenAllMarkets(updatedMarketsByChain);
+          return {
+            marketsByChain: updatedMarketsByChain,
+            allMarkets: allMarketsFlat,
+          };
+        });
       }
-      
-      if (successCount === 0) {
-        throw new Error('Failed to fetch any market data');
-      }
-      
-      set((state) => ({
-        marketsData: {
-          ...state.marketsData,
-          [chainId]: newMarketsData,
-        },
-        markets: {
-          ...state.markets,
-          [chainId]: markets,
-        },
-        isLoading: { ...state.isLoading, [chainId]: false },
-        errors: { ...state.errors, [chainId]: null },
-        lastFetch: { ...state.lastFetch, [chainId]: Date.now() },
-        hasFetched: { ...state.hasFetched, [chainId]: true },
-      }));
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch market data';
-      set((state) => ({
-        isLoading: { ...state.isLoading, [chainId]: false },
-        errors: { ...state.errors, [chainId]: errorMessage },
-      }));
-    }
+    );
   },
-  
-  fetchSingleMarketData: async (chainId: number, market: Market) => {
+
+  getChainMarkets: (chainId: number) => {
+    const state = get();
+    return Object.values(state.marketsByChain[chainId] || {});
+  },
+
+  refreshMarket: async (chainId: number, marketAddress: string) => {
     try {
-      const marketData = await fetchMarketData(market, chainId);
+      const marketData = await fetchCompleteMarketData(marketAddress, chainId);
       
       if (marketData) {
-        set((state) => ({
-          marketsData: {
-            ...state.marketsData,
-            [chainId]: {
-              ...(state.marketsData[chainId] || {}),
-              [market.address]: marketData,
-            },
-          },
-          lastFetch: { ...state.lastFetch, [chainId]: Date.now() },
-        }));
+        set((state) => {
+          const updatedChainMarkets = {
+            ...state.marketsByChain[chainId],
+            [marketAddress]: marketData
+          };
+          const updatedMarketsByChain = {
+            ...state.marketsByChain,
+            [chainId]: updatedChainMarkets
+          };
+          // Flatten the nested structure properly
+          const allMarketsFlat = flattenAllMarkets(updatedMarketsByChain);
+          
+          return {
+            marketsByChain: updatedMarketsByChain,
+            allMarkets: allMarketsFlat,
+          };
+        });
       }
-    } catch (err) {
-      console.error(`Error fetching market data for ${market.symbol}:`, err);
+    } catch (error) {
+      console.error(`Error refreshing market ${marketAddress} on chain ${chainId}:`, error);
     }
   },
-  
-  startAutoRefresh: (intervalMs: number = 60_000) => {
-    const state = get();
-    
-    // Clear existing interval if any
-    if (state.refreshInterval) {
-      clearInterval(state.refreshInterval);
-    }
-    
-    // Set up new interval
-    const interval = setInterval(async () => {
-      const currentState = get();
-      const { trackedChains, markets } = currentState;
-      
-      // Refresh all tracked chains
-      for (const chainId of trackedChains) {
-        const chainMarkets = markets[chainId];
-        if (chainMarkets && chainMarkets.length > 0) {
-          await currentState.fetchMarketsData(chainId, chainMarkets);
-        }
-      }
-    }, intervalMs);
-    
-    set({ refreshInterval: interval });
-  },
-  
-  stopAutoRefresh: () => {
-    const state = get();
-    if (state.refreshInterval) {
-      clearInterval(state.refreshInterval);
-      set({ refreshInterval: null });
-    }
-  },
-  
-  trackChain: (chainId: number) => {
-    set((state) => {
-      const newTrackedChains = new Set(state.trackedChains);
-      newTrackedChains.add(chainId);
-      return { trackedChains: newTrackedChains };
-    });
-  },
-  
-  untrackChain: (chainId: number) => {
-    set((state) => {
-      const newTrackedChains = new Set(state.trackedChains);
-      newTrackedChains.delete(chainId);
-      return { trackedChains: newTrackedChains };
-    });
-  },
-  
-  clearError: (chainId: number) => {
-    set((state) => ({
-      errors: { ...state.errors, [chainId]: null },
-    }));
-  },
-  
-  clearAll: () => {
-    get().stopAutoRefresh();
+
+  clearErrors: () => {
     set({
-      marketsData: {},
-      markets: {},
-      isLoading: {},
-      errors: {},
-      lastFetch: {},
-      hasFetched: {},
-      trackedChains: new Set(),
-    });
-  },
-  
-  clearChain: (chainId: number) => {
-    set((state) => {
-      const newState = {
-        marketsData: { ...state.marketsData },
-        markets: { ...state.markets },
-        isLoading: { ...state.isLoading },
-        errors: { ...state.errors },
-        lastFetch: { ...state.lastFetch },
-        hasFetched: { ...state.hasFetched },
-      };
-      
-      delete newState.marketsData[chainId];
-      delete newState.markets[chainId];
-      delete newState.isLoading[chainId];
-      delete newState.errors[chainId];
-      delete newState.lastFetch[chainId];
-      delete newState.hasFetched[chainId];
-      
-      const newTrackedChains = new Set(state.trackedChains);
-      newTrackedChains.delete(chainId);
-      
-      return { ...newState, trackedChains: newTrackedChains };
+      error: null,
+      errorsByChain: SUPPORTED_CHAINS.reduce((acc, chainId) => ({ ...acc, [chainId]: null }), {}),
     });
   },
 }));
-
-// Selectors for convenient data access
-export const selectMarketsData = (state: MarketsState, chainId: number) => 
-  state.marketsData[chainId] || {};
-
-export const selectMarkets = (state: MarketsState, chainId: number) => 
-  state.markets[chainId] || [];
-
-export const selectMarketsArray = (state: MarketsState, chainId: number): MarketData[] => 
-  Object.values(state.marketsData[chainId] || {});
-
-export const selectIsLoading = (state: MarketsState, chainId: number) => 
-  state.isLoading[chainId] || false;
-
-export const selectError = (state: MarketsState, chainId: number) => 
-  state.errors[chainId] || null;
-
-export const selectHasFetched = (state: MarketsState, chainId: number) => 
-  state.hasFetched[chainId] || false;
-
-// Selector to get all markets across all chains
-export const selectAllMarketsArray = (state: MarketsState): MarketData[] => {
-  const allMarkets: MarketData[] = [];
-  for (const chainId in state.marketsData) {
-    const chainMarkets = Object.values(state.marketsData[chainId] || {});
-    allMarkets.push(...chainMarkets);
-  }
-  return allMarkets;
-};
-
-// Selector to get all markets across all chains with chainId included
-export const selectAllMarketsWithChain = (state: MarketsState): MarketDataWithChain[] => {
-  const allMarkets: MarketDataWithChain[] = [];
-  for (const chainId in state.marketsData) {
-    const chainMarkets = Object.values(state.marketsData[chainId] || {});
-    allMarkets.push(
-      ...chainMarkets.map(m => ({ ...m, chainId: parseInt(chainId) }))
-    );
-  }
-  return allMarkets;
-};

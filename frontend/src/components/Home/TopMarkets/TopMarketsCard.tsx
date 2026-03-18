@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { useMarketsStore } from '../../../store/markets';
-import type { MarketDataWithChain } from '../../../store/markets';
 import { ArrowRight } from 'react-feather';
 import { getTokenIcon } from '../../../utils/tokenIcons';
+import { useMarketsStore } from '../../../store/markets';
+import type { MarketData } from '../../../hooks/useMarketsData';
 
 interface TopMarketsCardProps {
   onNavigate: (path: string) => void;
@@ -22,9 +22,8 @@ const TOKEN_NAMES: Record<string, string> = {
   'SIX': 'Six Protocol',
   'WBTC': 'Wrapped Bitcoin',
   'WETH': 'Wrapped Ethereum',
-  'KDAI': 'KaiDAI',
-  'KUSDT': 'KaiUSDT',
-  'KUSDC': 'KaiUSDC',
+  'KUSDT': 'KUB-Pegged USDT',
+  'KUSDC': 'KUB-Pegged USDC',
   'MBX': 'MARBLEX',
   'stKAIA': 'Lair Staked KAIA',
   'ETH': 'Ethereum',
@@ -33,14 +32,18 @@ const TOKEN_NAMES: Record<string, string> = {
   'CEUR': 'Celo Euro',
 };
 
+interface MarketDataWithChain extends MarketData {
+  chainId: number;
+}
+
 export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
-  const marketsData = useMarketsStore((state) => state.marketsData);
+  const marketsByChain = useMarketsStore((state) => state.marketsByChain);
 
   // Compute all markets with chainId and top 5 markets (memoized)
   const topMarkets = useMemo(() => {
     const allMarkets: MarketDataWithChain[] = [];
-    for (const chainId in marketsData) {
-      const chainMarkets = Object.values(marketsData[chainId] || {});
+    for (const chainId in marketsByChain) {
+      const chainMarkets = Object.values(marketsByChain[chainId] || {});
       allMarkets.push(
         ...chainMarkets.map(m => ({ ...m, chainId: parseInt(chainId) }))
       );
@@ -54,7 +57,7 @@ export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
       .slice(0, 5);
 
     return sorted;
-  }, [marketsData]);
+  }, [marketsByChain]);
 
   const handleNavigateToMarkets = () => {
     onNavigate('/markets');
@@ -64,10 +67,10 @@ export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
 
   const renderTokenIcon = (market: MarketDataWithChain): React.ReactNode => {
     const iconUrl = getTokenIcon(market.symbol);
-    
+
     return (
-      <img 
-        src={iconUrl} 
+      <img
+        src={iconUrl}
         alt={market.symbol}
         className="w-8 h-8 rounded-full flex-shrink-0"
         onError={(e) => {
@@ -88,10 +91,10 @@ export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 mb-2">
-            Supply with Best Rates
+            Live Lending Markets
           </h3>
           <p className="text-sm text-slate-500 font-medium">
-            Earn Competitive APY on Your Assets
+            Supply assets used by autonomous agents and capture on-chain lending returns
           </p>
         </div>
         <button
@@ -108,7 +111,7 @@ export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
         {topMarkets.map((market) => {
           const chainName = CHAIN_NAMES[market.chainId] || 'Unknown';
           const isHigh = isHighAPY(market.rates.supplyApy);
-          
+
           return (
             <div
               key={`${market.chainId}-${market.address}`}
@@ -136,9 +139,8 @@ export const TopMarketsCard = ({ onNavigate }: TopMarketsCardProps) => {
               {/* APY */}
               <div className="flex flex-col items-end">
                 <span
-                  className={`text-xl font-bold ${
-                    isHigh ? 'text-green-600' : 'text-slate-800'
-                  }`}
+                  className={`text-xl font-bold ${isHigh ? 'text-green-600' : 'text-slate-800'
+                    }`}
                 >
                   {market.rates.supplyApy.toFixed(2)}%
                 </span>

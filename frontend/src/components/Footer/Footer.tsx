@@ -12,7 +12,7 @@ export const Footer = () => {
             className="h-13 w-38"
           />
           <p className="text-sm leading-relaxed text-slate-400 max-w-[320px]">
-            KiloLend is the capital layer for tokenized AI agents.
+            KiloLend is the capital layer for autonomous agents enabling on-chain lending, borrowing, and execution through programmable wallets.
           </p>
         </div>
 

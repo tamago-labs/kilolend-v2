@@ -4,7 +4,7 @@
  */
 
 // Comptroller Contract Hooks
-export { useComptrollerContract, useUserMarkets } from './useComptrollerContract';
+export { useComptrollerContract, useUserMarkets, fetchMarketsFromComptroller } from './useComptrollerContract';
 
 // Market Contract Hooks
 export {
@@ -36,12 +36,6 @@ export {
   type MarketData,
 } from './useMarketsData';
 
-// Market Initialization Hooks
-export {
-  useInitializeMarkets,
-  useInitializeMultiChain,
-} from './useInitializeMarkets';
-
 // Price Hooks
 export {
   usePrices,
@@ -51,3 +45,13 @@ export {
   usePricesError,
   useRefreshPrices,
 } from './usePrices';
+
+// Markets Store Hooks
+export {
+  useMarkets as useMarketsStore,
+  useChainMarkets,
+  useMarketsLoading,
+  useMarketsError,
+  useRefreshMarkets,
+  useRefreshChainMarkets,
+} from './useMarketsStore';
