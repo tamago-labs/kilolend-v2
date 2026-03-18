@@ -309,7 +309,7 @@ export const useMarketsStore = create<MarketsState>((set, get) => ({
   },
 
   fetchChainMarkets: async (chainId: number) => {
-    const markets = await fetchChainMarketsInternal(
+    await fetchChainMarketsInternal(
       chainId,
       (loading) => set((state) => ({
         loadingByChain: { ...state.loadingByChain, [chainId]: loading }
