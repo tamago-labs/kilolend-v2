@@ -10,7 +10,7 @@ import { Portfolio } from './pages/Portfolio';
 import { Leaderboard } from './pages/Leaderboard';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
-import { usePrices, useMarketsStore } from './hooks';
+import { usePrices, useMarketsData } from './hooks';
 
 const currentPageToComponent: Record<string, React.ComponentType> = {
   '/': Home,
@@ -28,8 +28,8 @@ function App() {
   // Initialize prices
   usePrices();
   
-  // Initialize markets 
-  useMarketsStore();
+  // Initialize markets (fetches from all chains on first use, with guards to prevent duplicate fetches)
+  useMarketsData();
   
   const [currentPage, setCurrentPage] = useState('/');
 

@@ -48,7 +48,7 @@ export {
 
 // Markets Store Hooks
 export {
-  useMarkets as useMarketsStore,
+  useMarketsData,
   useChainMarkets,
   useMarketsLoading,
   useMarketsError,

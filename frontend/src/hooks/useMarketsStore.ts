@@ -3,29 +3,32 @@
  * Convenient hooks for accessing markets from the store
  */
 
-import { useEffect } from 'react';
-import { useMarketsStore, type MarketsState } from '../store/markets';
+import { useEffect, useRef } from 'react';
+import { useMarketsStore as useMarketsStoreBase, type MarketsState } from '../store/markets';
 
 /**
  * Main hook to access all markets from the store
  * Automatically fetches markets on first use (all chains)
  * 
  * @example
- * const { allMarkets, marketsByChain, isLoading, error, fetchAllMarkets } = useMarkets();
+ * const { allMarkets, marketsByChain, isLoading, error, fetchAllMarkets } = useMarketsData();
  * const allMarketsList = allMarkets; // All markets across all chains
  * const kubChainMarkets = marketsByChain[96]; // BitKUB chain markets
  */
-export function useMarkets(): MarketsState & {
+export function useMarketsData(): MarketsState & {
   initializeMarkets: () => Promise<void>;
 } {
-  const store = useMarketsStore();
+  const store = useMarketsStoreBase();
+  const isInitializing = useRef(false);
   
-  // Fetch markets on first use (only once)
+  // Fetch markets on first use (only once, with guard to prevent race conditions)
   useEffect(() => {
-    if (!store.hasFetched && !store.isLoading) {
+    // Double-check: only fetch if not already fetched, not loading, and not already initializing
+    if (!store.hasFetched && !store.isLoading && !isInitializing.current) {
+      isInitializing.current = true;
       store.fetchAllMarkets();
     }
-  }, [store.hasFetched, store.isLoading]);
+  }, [store.hasFetched, store.isLoading, store.fetchAllMarkets]);
   
   return {
     ...store,
@@ -44,33 +47,33 @@ export function useMarkets(): MarketsState & {
  * const kaiaMarkets = useChainMarkets(8217); // KAIA chain markets
  */
 export function useChainMarkets(chainId: number) {
-  return useMarketsStore((state) => state.getChainMarkets(chainId));
+  return useMarketsStoreBase((state) => state.getChainMarkets(chainId));
 }
 
 /**
  * Check if markets are loading
  */
 export function useMarketsLoading(): boolean {
-  return useMarketsStore((state) => state.isLoading);
+  return useMarketsStoreBase((state) => state.isLoading);
 }
 
 /**
  * Get market error message
  */
 export function useMarketsError(): string | null {
-  return useMarketsStore((state) => state.error);
+  return useMarketsStoreBase((state) => state.error);
 }
 
 /**
  * Manually refresh all markets
  */
 export function useRefreshMarkets(): () => Promise<void> {
-  return useMarketsStore((state) => state.fetchAllMarkets);
+  return useMarketsStoreBase((state) => state.fetchAllMarkets);
 }
 
 /**
  * Manually refresh markets for a specific chain
  */
 export function useRefreshChainMarkets(): (chainId: number) => Promise<void> {
-  return useMarketsStore((state) => state.fetchChainMarkets);
+  return useMarketsStoreBase((state) => state.fetchChainMarkets);
 }

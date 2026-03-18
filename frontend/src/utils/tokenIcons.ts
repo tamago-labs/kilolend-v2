@@ -59,7 +59,7 @@ export const getTokenIcon = (symbol: string): string => {
     return 'https://s2.coinmarketcap.com/static/img/coins/64x64/1027.png';
   }
   if (upperSymbol === 'CELO') {
-    return 'https://s2.coinmarketcap.com/static/img/coins/64x64/6636.png';
+    return 'https://s2.coinmarketcap.com/static/img/coins/64x64/5567.png';
   }
   if (upperSymbol === 'CEUR') {
     return 'https://s2.coinmarketcap.com/static/img/coins/64x64/19535.png';

@@ -128,7 +128,45 @@ async function fetchCompleteMarketData(
 }
 
 /**
- * Fetch all markets for a specific chain
+ * Sleep/delay utility function
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetch a single market with retry logic
+ */
+async function fetchMarketWithRetry(
+  address: string,
+  chainId: number,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<MarketData | null> {
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fetchCompleteMarketData(address, chainId);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Don't retry on the last attempt
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s, etc.
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.warn(`Retry ${attempt + 1}/${maxRetries} for market ${address} on chain ${chainId} after ${delay}ms`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  console.error(`Failed to fetch market ${address} on chain ${chainId} after ${maxRetries} retries:`, lastError);
+  return null;
+}
+
+/**
+ * Fetch all markets for a specific chain with batching and rate limiting
  */
 async function fetchChainMarketsInternal(
   chainId: number,
@@ -140,7 +178,6 @@ async function fetchChainMarketsInternal(
   setError(null);
 
   try {
-
     // Get all market addresses from Comptroller
     const marketAddresses = await fetchMarketsFromComptroller(chainId);
     
@@ -150,22 +187,41 @@ async function fetchChainMarketsInternal(
       return [];
     }
 
-    // Fetch complete data for each market (parallel)
-    const marketDataPromises = marketAddresses.map(async (address) => {
-      return await fetchCompleteMarketData(address, chainId);
-    });
-
-    const marketResults = await Promise.all(marketDataPromises);
-
-    // Filter out null results and build the markets object
-    const successfulMarkets = marketResults.filter((m): m is MarketData => m !== null);
+    // Fetch markets in batches to avoid rate limiting
+    // Batch size: 3-5 markets at a time, with 500ms delay between batches
+    const BATCH_SIZE = 4;
+    const BATCH_DELAY = 500;
     const marketsMap: Record<string, MarketData> = {};
+    const successfulMarkets: MarketData[] = [];
     
-    successfulMarkets.forEach((market) => {
-      marketsMap[market.address] = market;
-    });
+    for (let i = 0; i < marketAddresses.length; i += BATCH_SIZE) {
+      const batch = marketAddresses.slice(i, i + BATCH_SIZE);
+      
+      console.log(`Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(marketAddresses.length / BATCH_SIZE)} for chain ${chainId} (${batch.length} markets)`);
+      
+      // Fetch batch in parallel (smaller batch size prevents rate limiting)
+      const batchPromises = batch.map(async (address) => {
+        return await fetchMarketWithRetry(address, chainId);
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Collect successful results
+      batchResults.forEach((result) => {
+        if (result) {
+          marketsMap[result.address] = result;
+          successfulMarkets.push(result);
+        }
+      });
+      
+      // Add delay between batches (except for the last batch)
+      if (i + BATCH_SIZE < marketAddresses.length) {
+        await sleep(BATCH_DELAY);
+      }
+    }
 
     setMarkets(marketsMap);
+    console.log(`Successfully fetched ${successfulMarkets.length}/${marketAddresses.length} markets for chain ${chainId}`);
     return successfulMarkets;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : `Failed to fetch markets for chain ${chainId}`;
@@ -199,9 +255,17 @@ export const useMarketsStore = create<MarketsState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      // Fetch markets from all chains in parallel
-      const chainPromises = SUPPORTED_CHAINS.map(async (chainId) => {
-        return await fetchChainMarketsInternal(
+      const allChainResults: MarketData[][] = [];
+      
+      // Fetch markets from all chains sequentially to avoid rate limiting
+      // Add 1 second delay between chains
+      const CHAIN_DELAY = 1000;
+      
+      for (let i = 0; i < SUPPORTED_CHAINS.length; i++) {
+        const chainId = SUPPORTED_CHAINS[i];
+        console.log(`Fetching chain ${i + 1}/${SUPPORTED_CHAINS.length}: ${chainId}`);
+        
+        const chainMarkets = await fetchChainMarketsInternal(
           chainId,
           (loading) => set((state) => ({
             loadingByChain: { ...state.loadingByChain, [chainId]: loading }
@@ -213,9 +277,15 @@ export const useMarketsStore = create<MarketsState>((set, get) => ({
             marketsByChain: { ...state.marketsByChain, [chainId]: markets }
           }))
         );
-      });
-
-      const allChainResults = await Promise.all(chainPromises);
+        
+        allChainResults.push(chainMarkets);
+        
+        // Add delay between chains (except for the last chain)
+        if (i < SUPPORTED_CHAINS.length - 1) {
+          console.log(`Waiting ${CHAIN_DELAY}ms before fetching next chain...`);
+          await sleep(CHAIN_DELAY);
+        }
+      }
 
       // Flatten all markets into a single array
       const allMarketsFlat = allChainResults.flat();
@@ -226,6 +296,8 @@ export const useMarketsStore = create<MarketsState>((set, get) => ({
         error: null,
         hasFetched: true,
       });
+      
+      console.log(`Successfully fetched ${allMarketsFlat.length} total markets from all chains`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch markets';
       set({
